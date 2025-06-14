@@ -1,17 +1,31 @@
-// server.js
 import express from 'express';
 import nodemailer from 'nodemailer';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import sanitizeHtml from 'sanitize-html';
 
-dotenv.config(); // Charge les variables d'environnement
+dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Fonction de nettoyage
+const cleanInput = (input) =>
+  sanitizeHtml(input, {
+    allowedTags: [],
+    allowedAttributes: {}
+  });
+
 app.post('/api/contact', async (req, res) => {
-  const { name, email, message } = req.body;
+  const rawName = req.body.name;
+  const rawEmail = req.body.email;
+  const rawMessage = req.body.message;
+
+  // 🔐 Nettoyage des entrées
+  const name = cleanInput(rawName);
+  const email = cleanInput(rawEmail);
+  const message = cleanInput(rawMessage);
 
   const transporter = nodemailer.createTransport({
     host: 'smtp.hostinger.com',
@@ -24,13 +38,15 @@ app.post('/api/contact', async (req, res) => {
   });
 
   try {
-await transporter.sendMail({
-  from: 'contact@naelalaji.com', // expéditeur AUTHENTIFIÉ (celui de Hostinger)
-  to: 'contact@naelalaji.com',   // ou un autre destinataire
-  replyTo: email,                // ← ici tu mets l'adresse du visiteur du site
-  subject: `Message de ${name}`,
-  text: message
-});
+    await transporter.sendMail({
+      from: 'contact@naelalaji.com',
+      to: 'contact@naelalaji.com',
+      replyTo: email,
+      subject: `Message de ${name}`,
+      text: message,
+      // Optionnel : message au format HTML échappé
+      html: `<pre style="font-family:sans-serif">${message}</pre>`
+    });
 
     res.status(200).send('✅ Message envoyé');
   } catch (err) {
